@@ -10,17 +10,17 @@
 //
 // Author: Florian Zaruba, ETH Zurich
 // Description: Contains SoC information as constants
-
-`ifndef ARIANE_SOC
-`define ARIANE_SOC
-
-`include "ariane_pkg.sv"
 package ariane_soc;
   // M-Mode Hart, S-Mode Hart
   localparam int unsigned NumTargets = 2;
   // Uart, SPI, Ethernet, reserved
   localparam int unsigned NumSources = 30;
   localparam int unsigned MaxPriority = 7;
+
+  // Number of interrupt wires used by IOMMU (1, 2, 4, 8, 16)
+  localparam int unsigned IOMMUNumWires = 4;
+  // Last used interrupt wire index
+  localparam int unsigned LastIntIndex = 6 + IOMMUNumWires;
 
   typedef enum int unsigned {
     CVA6        = 0,
@@ -30,28 +30,27 @@ package ariane_soc;
   } axi_master_t;
 
   // Added IOMMU Completion IF port and Memory IF port (+2)
-  localparam NrSlaves = 2+2; // actually masters, but slaves on the crossbar
+  localparam NrSlaves = 4; // actually masters, but slaves on the crossbar
 
   // 4 is recommended by AXI standard, so lets stick to it, do not change
   localparam IdWidth   = 4;
   localparam IdWidthSlave = IdWidth + $clog2(NrSlaves);
-
-  localparam IOMMUNumWires = 4;
 
   // must be in order from highest address to lowest
   typedef enum int unsigned {
     DRAM      =  0,
     IOMMU_CFG =  1, // IOMMU programming IF
     DMA_CFG   =  2, // DMA slave port for configuration of the engine
-    GPIO      =  3,
-    Ethernet  =  4,
-    SPI       =  5,
-    Timer     =  6,
-    UART      =  7,
-    PLIC      =  8,
-    CLINT     =  9,
-    ROM       =  10,
-    Debug     =  11
+    DMA_CFG2 = 3,
+    GPIO      =  4,
+    Ethernet  =  5,
+    SPI       =  6,
+    Timer     =  7,
+    UART      =  8,
+    PLIC      =  9,
+    CLINT     =  10,
+    ROM       =  11,
+    Debug     =  12
   } axi_slaves_t;
 
   localparam NB_PERIPHERALS = Debug + 1;
@@ -66,7 +65,8 @@ package ariane_soc;
   localparam logic[63:0] SPILength      = 64'h800000;
   localparam logic[63:0] EthernetLength = 64'h10000;
   localparam logic[63:0] GPIOLength     = 64'h1000;
-  localparam logic[63:0] DMALength      = 64'h1000;     //? Correct value for this?
+  localparam logic[63:0] DMALength      = 64'h1000;  
+  localparam logic[63:0] DMA2Length      = 64'h1000;   
   localparam logic[63:0] IOMMULength    = 64'h1000;     // Regmap occupies 4kiB of memory address space
   localparam logic[63:0] DRAMLength     = 64'h40000000; // 1GByte of DDR (split between two chips on Genesys2)
   localparam logic[63:0] SRAMLength     = 64'h1800000;  // 24 MByte of SRAM
@@ -83,16 +83,15 @@ package ariane_soc;
     SPIBase      = 64'h2000_0000,
     EthernetBase = 64'h3000_0000,
     GPIOBase     = 64'h4000_0000,
-    DMABase      = 64'h5000_0000, //? Correct value for this?
-    IOMMUBase    = 64'h5001_0000, //? Correct value for this?
+    DMABase      = 64'h5000_0000,
+    DMA2Base     = 64'h5000_1000,
+    IOMMUBase    = 64'h5001_0000,
     DRAMBase     = 64'h8000_0000
   } soc_bus_start_t;
 
   localparam NrRegion = 1;
   localparam logic [NrRegion-1:0][NB_PERIPHERALS-1:0] ValidRule = {{NrRegion * NB_PERIPHERALS}{1'b1}};
 
-  /* verilator lint_off WIDTH */
-  /* verilator lint_off WIDTHCONCAT */
   localparam ariane_pkg::ariane_cfg_t ArianeSocCfg = '{
     RASDepth: cva6_config_pkg::CVA6ConfigRASDepth,
     BTBEntries: cva6_config_pkg::CVA6ConfigBTBEntries,
@@ -115,9 +114,5 @@ package ariane_soc;
     DmBaseAddress:          DebugBase,
     NrPMPEntries:           cva6_config_pkg::CVA6ConfigNrPMPEntries
   };
-  /* verilator lint_on WIDTHCONCAT */
-  /* verilator lint_on WIDTH */
 
 endpackage
-
-`endif
